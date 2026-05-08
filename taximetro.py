@@ -47,10 +47,10 @@ def taximeter():
             inicio_viaje = time.time()
             tiempo_parado = 0
             tiempo_movimiento = 0
-            estado_actual = "stopped" #Inciamos en estado detenido
+            estado_actual = "s"
             inicio_estado = time.time()
 
-            print("Viaje iniciado. EStado inciial: 'stopped'")
+            print("Viaje iniciado. EStado incial: 'stopped'")
 
         elif command == ("stop", "move"):
             if not viaje_activo:
@@ -70,7 +70,7 @@ def taximeter():
             estado_actual == "stopped" if command == "stop" else "moving"
             inicio_estado = time.time()
             
-            print(f"state changed to '{state} .")
+            print(f"state changed to '{estado_actual} .")
         
         elif command == "finish":   
             if not viaje_activo:
@@ -94,6 +94,8 @@ def taximeter():
             print(f"Tiempo en movimiento: {tiempo_movimiento:.1f} s")
             print(f"total_fare: € {total_fare:.2f}")
             print("-------------------------------\n")
+
+            print("Inicia un nuevo viaje con 'start' o salir con 'exit'.")
 
             #Reset la svariables para el próximo viaje 
             trip_active = False
