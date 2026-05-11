@@ -1,1 +1,2 @@
 2026-05-11 13:02:54 - Usuario: gabriela, Tarifa: €0.23, Duración Total: 11.3s, Parado: 11.3s, Moviendo: 0.0s
+2026-05-11 20:49:58 - User: gabriela, Tarifa: €0.67, Duración Total: 25.2s, Parado: 19.7s, Moviendo: 5.5s

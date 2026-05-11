@@ -2,6 +2,7 @@ import time
 import sqlite3
 import hashlib
 import unittest
+from datetime import datetime
 
 def calculate_fare(seconds_stopped, seconds_moving, tarifa_parado, tarifa_movimiento):
     """
@@ -20,10 +21,6 @@ def calculate_fare(seconds_stopped, seconds_moving, tarifa_parado, tarifa_movimi
     fare = (seconds_stopped * tarifa_parado + seconds_moving * tarifa_movimiento)
     print(f"Total: {fare:.2f} €")
     return fare
-
-import time
-import sqlite3
-import hashlib
 
 def configurar_tarifas():
     """
@@ -188,6 +185,116 @@ def login():
     
     return None
 
+def update_state_duration(estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento):
+    """
+    Actualiza el tiempo acumulado basado en el estado actual.
+    
+    Parámetros:
+    - estado_actual: estado actual ('stopped' o 'moving')
+    - inicio_estado: tiempo de inicio del estado actual
+    - tiempo_parado: tiempo acumulado parado (float)
+    - tiempo_movimiento: tiempo acumulado en movimiento (float)
+    
+    Devuelve:
+    - tiempo_parado, tiempo_movimiento: valores actualizados
+    """
+    duration = time.time() - inicio_estado
+    if estado_actual == "stopped":
+        tiempo_parado += duration
+    else:
+        tiempo_movimiento += duration
+    return tiempo_parado, tiempo_movimiento
+
+def handle_start(viaje_activo, inicio_viaje, tiempo_parado, tiempo_movimiento, estado_actual, inicio_estado):
+    """
+    Maneja el comando 'start' para iniciar un nuevo viaje.
+    """
+    if viaje_activo:
+        print("\n⚠️  ERROR: Ya hay un viaje en curso")
+        print("   Usa 'finish' para finalizar antes de iniciar uno nuevo.\n")
+        return viaje_activo, inicio_viaje, tiempo_parado, tiempo_movimiento, estado_actual, inicio_estado
+    viaje_activo = True
+    inicio_viaje = time.time()
+    tiempo_parado = 0
+    tiempo_movimiento = 0
+    estado_actual = "stopped"
+    inicio_estado = time.time()
+    print("Viaje iniciado. Estado incial: 'stopped'.")
+    return viaje_activo, inicio_viaje, tiempo_parado, tiempo_movimiento, estado_actual, inicio_estado
+
+def handle_stop_or_move(command, viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento):
+    """
+    Maneja los comandos 'stop' y 'move'.
+    """
+    if not viaje_activo:
+        print("Error: no hay un viaje en curso. Por favor empice un viaje.")
+        return viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento
+    tiempo_parado, tiempo_movimiento = update_state_duration(estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento)
+    estado_actual = "stopped" if command == "stop" else "moving"
+    inicio_estado = time.time()
+    print(f"state changed to '{estado_actual}' .")
+    return viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento
+
+def handle_finish(viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento, tarifa_parado, tarifa_movimiento, user):
+    """
+    Maneja el comando 'finish' para finalizar el viaje.
+    """
+    if not viaje_activo:
+        print("Error: no hay un viaje en curso para finalizar.")
+        return viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento
+    tiempo_parado, tiempo_movimiento = update_state_duration(estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento)
+    total_fare = calculate_fare(tiempo_parado, tiempo_movimiento, tarifa_parado, tarifa_movimiento)
+    total_duration = tiempo_parado + tiempo_movimiento
+    guardar_historial(user, total_fare, total_duration, tiempo_parado, tiempo_movimiento)
+    hourly_rate = (total_fare / total_duration) * 3600 if total_duration > 0 else 0
+    print("\n" + "=" * 40)
+    print("       RESUMEN DE TU VIAJE")
+    print("=" * 40)
+    print(f"Duración total:      {total_duration:.1f} s ({total_duration/60:.1f} min)")
+    print(f"Tiempo parado:       {tiempo_parado:.1f} s ({tiempo_parado/60:.1f} min)")
+    print(f"Tiempo en movimiento: {tiempo_movimiento:.1f} s ({tiempo_movimiento/60:.1f} min)")
+    print("-" * 40)
+    print(f"Tarifa total:        € {total_fare:.2f}")
+    print(f"Tarifa por hora:     € {hourly_rate:.2f}/h")
+    print("=" * 40 + "\n")
+    print("=" * 40)
+    print("¿Qué deseas hacer ahora?")
+    print("  'start' - Iniciar un nuevo viaje")
+    print("  'exit'  - Salir del programa")
+    print("=" * 40 + "\n")
+    # Reset variables para el próximo viaje
+    viaje_activo = False
+    estado_actual = None
+    return viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento
+
+def handle_exit(viaje_activo, estado_actual):
+    """
+    Maneja el comando 'exit' para salir del programa.
+    Devuelve True si debe salir, False si continuar.
+    """
+    confirm = input("¿Estás seguro de que deseas salir? (s/n): ").strip().lower()
+    if confirm == "s":
+        print("\n¡Gracias por usar el taxímetro! ¡Hasta luego!\n")
+        return True
+    else:
+        print("\n" + "=" * 40)
+        print("Operación cancelada. Continuando...")
+        print("=" * 40)
+        if viaje_activo:
+            print("Estado actual: Viaje en curso")
+        else:
+            print("Estado actual: Sin viaje activo")
+        print("Próximos pasos:")
+        if viaje_activo:
+            print("  • 'stop'   - Detener el taxi")
+            print("  • 'move'   - Reanudar movimiento")
+            print("  • 'finish' - Finalizar el viaje actual")
+        else:
+            print("  • 'start'  - Iniciar un nuevo viaje")
+        print("  • 'exit'   - Salir del programa")
+        print("=" * 40 + "\n")
+        return False
+
 def taximeter():
     """
     Función para mostrar las opciones del taxímetro.
@@ -227,116 +334,24 @@ def taximeter():
 
     # Codificando el event loop 
     
-    while True:
+    should_exit = False
+    while not should_exit:
         command = input("> ").strip().lower()
 
         if command == "start":
-            if viaje_activo:
-                print("\n⚠️  ERROR: Ya hay un viaje en curso")
-                print("   Usa 'finish' para finalizar antes de iniciar uno nuevo.\n")
-                continue
-            viaje_activo = True
-            inicio_viaje = time.time()
-            tiempo_parado = 0
-            tiempo_movimiento = 0
-            estado_actual = "stopped"
-            inicio_estado = time.time()
-            print("Viaje iniciado. Estado incial: 'stopped'.")
+            viaje_activo, inicio_viaje, tiempo_parado, tiempo_movimiento, estado_actual, inicio_estado = handle_start(viaje_activo, inicio_viaje, tiempo_parado, tiempo_movimiento, estado_actual, inicio_estado)
 
         elif command in ("stop", "move"):
-            if not viaje_activo:
-                print("Error: no hay un viaje en curso. Por favor empice un viaje.")
-                continue
-            #calcula el tiempo transcurrido en el estado actual antes de cambiar
-            duration= time.time() - inicio_estado 
-            if estado_actual == "stopped":
-                tiempo_parado += duration
-            else:
-                tiempo_movimiento += duration
+            viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento = handle_stop_or_move(command, viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento)
 
-            # Cambio el estado actual y reinicia el tiempo de inicio del estado
-            estado_actual = "stopped" if command == "stop" else "moving"
-            inicio_estado = time.time()
-            print(f"state changed to '{estado_actual}' .")
-        
-        elif command == "finish":   
-            if not viaje_activo:
-                print("Error: no hay un viaje en curso para finalizar.")
-                continue
-              
-            # Agrega tiempo del último estado
-            duration = time.time() - inicio_estado
-            if estado_actual == "stopped":
-                tiempo_parado += duration
-            else:
-                tiempo_movimiento += duration
+        elif command == "finish":
+            viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento = handle_finish(viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento, tarifa_parado, tarifa_movimiento, user)
 
-            # Calcula la tarifa total y muestra el reumen del viaje
-            
-            total_fare = calculate_fare(tiempo_parado, tiempo_movimiento, tarifa_parado, tarifa_movimiento)
-
-            total_duration = tiempo_parado + tiempo_movimiento
-            
-            guardar_historial(
-                user,
-                total_fare,
-                total_duration,
-                tiempo_parado,
-                tiempo_movimiento
-            )
-            
-            hourly_rate = (total_fare / total_duration) * 3600 if total_duration > 0 else 0
-            
-            print("\n" + "=" * 40)
-            print("       RESUMEN DE TU VIAJE")
-            print("=" * 40)
-            print(f"Duración total:      {total_duration:.1f} s ({total_duration/60:.1f} min)")
-            print(f"Tiempo parado:       {tiempo_parado:.1f} s ({tiempo_parado/60:.1f} min)")
-            print(f"Tiempo en movimiento: {tiempo_movimiento:.1f} s ({tiempo_movimiento/60:.1f} min)")
-            print("-" * 40)
-            print(f"Tarifa total:        € {total_fare:.2f}")
-            print(f"Tarifa por hora:     € {hourly_rate:.2f}/h")
-            print("=" * 40 + "\n")
-
-            print("=" * 40)
-            print("¿Qué deseas hacer ahora?")
-            print("  'start' - Iniciar un nuevo viaje")
-            print("  'exit'  - Salir del programa")
-            print("=" * 40 + "\n")
-
-            # Reset la svariables para el próximo viaje 
-           
-            viaje_activo = False
-            estado_actual = None
-            continue        
-        
         elif command == "exit":
-            confirm = input("¿Estás seguro de que deseas salir? (s/n): ").strip().lower()
-            if confirm == "s":
-                print("\n¡Gracias por usar el taxímetro! ¡Hasta luego!\n")
-                break
-            else:
-                print("\n" + "=" * 40)
-                print("Operación cancelada. Continuando...")
-                print("=" * 40)
-                if viaje_activo:
-                    print("Estado actual: Viaje en curso")
-                else:
-                    print("Estado actual: Sin viaje activo")
-                print("Próximos pasos:")
-                if viaje_activo:
-                    print("  • 'stop'   - Detener el taxi")
-                    print("  • 'move'   - Reanudar movimiento")
-                    print("  • 'finish' - Finalizar el viaje actual")
-                else:
-                    print("  • 'start'  - Iniciar un nuevo viaje")
-                print("  • 'exit'   - Salir del programa")
-                print("=" * 40 + "\n")
-                continue   
-        
+            should_exit = handle_exit(viaje_activo, estado_actual)
+
         else:
-            print("Comando no reconocido. Por favor, use 'start', 'stop', 'move', 'finish' o 'exit'.")                                
-import time
+            print("Comando no reconocido. Por favor, use 'start', 'stop', 'move', 'finish' o 'exit'.")
 from datetime import datetime
 
 def guardar_historial(username, fare, total_duration, tiempo_parado, tiempo_movimiento):
