@@ -44,17 +44,7 @@ def init_database():
     conn.commit()
     conn.close()
 
-def calculate_fare(seconds_stopped, seconds_moving): #Test Unitario para la función de cálculo de tarifa
-    return seconds_stopped*0.02 + seconds_moving *0.05
 
-class TestFareCalculation(unittest.TestCase):
-        def test_fare_calculation(self):
-            self.assertAlmostEqual(calculate_fare(0, 0), 0.00)
-            self.assertAlmostEqual(calculate_fare(60, 0), 1.20)  # 60s stopped
-            self.assertAlmostEqual(calculate_fare(0, 60), 3.00)  # 60s moving
-            self.assertAlmostEqual(calculate_fare(30, 30), 2.10) # 30s stopped + 30s moving
-            self.assertAlmostEqual(calculate_fare(120, 240), 14.40) # 120s stopped + 240s moving    
-unittest.main(argv=[''], exit=False)
 
 def register():
     """
@@ -254,7 +244,17 @@ def taximeter():
             # Calcula la tarifa total y muestra el reumen del viaje
             
             total_fare = calculate_fare(tiempo_parado, tiempo_movimiento)
+
             total_duration = tiempo_parado + tiempo_movimiento
+            
+            guardar_historial(
+                user,
+                total_fare,
+                total_duration,
+                tiempo_parado,
+                tiempo_movimiento
+            )
+            
             hourly_rate = (total_fare / total_duration) * 3600 if total_duration > 0 else 0
             
             print("\n" + "=" * 40)
@@ -306,6 +306,43 @@ def taximeter():
         
         else:
             print("Comando no reconocido. Por favor, use 'start', 'stop', 'move', 'finish' o 'exit'.")                                
-                                       
+import time
+from datetime import datetime
+
+def guardar_historial(username, fare, total_duration, tiempo_parado, tiempo_movimiento):
+    """
+    Guarda el historial de viajes en un archivo de texto plano.
+    """
+    fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    #Creamos la línea con formato: Fecha | Usuario | Tarifa | Duración | Parado | Moviendo
+    
+    registro = (
+        f"{fecha} - "
+        f"User: {username}, "
+        f"Tarifa: €{fare:.2f}, "
+        f"Duración Total: {total_duration:.1f}s, "
+        f"Parado: {tiempo_parado:.1f}s, "
+        f"Moviendo: {tiempo_movimiento:.1f}s\n"
+    )
+    # "a" abre el archivo para añadir texto sin borar lo anterior.
+    
+    with open("historial_viajes.txt", "a", encoding="utf-8") as f:
+        f.write(registro)
+    print("-> Registro guardado en el archivo plano.")
+    return registro
+
+#Test Unitario para la función de guardar historial
+def calculate_fare(seconds_stopped, seconds_moving): 
+    return seconds_stopped*0.02 + seconds_moving *0.05
+
+class TestFareCalculation(unittest.TestCase):
+        def test_fare_calculation(self):
+            self.assertAlmostEqual(calculate_fare(0, 0), 0.00)
+            self.assertAlmostEqual(calculate_fare(60, 0), 1.20)  # 60s stopped
+            self.assertAlmostEqual(calculate_fare(0, 60), 3.00)  # 60s moving
+            self.assertAlmostEqual(calculate_fare(30, 30), 2.10) # 30s stopped + 30s moving
+            self.assertAlmostEqual(calculate_fare(120, 240), 14.40) # 120s stopped + 240s moving    
+#MAIN
 if __name__ == "__main__":
     taximeter()
