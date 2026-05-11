@@ -1,6 +1,7 @@
 import time
 import sqlite3
 import hashlib
+import unittest
 
 def calculate_fare(seconds_stopped, seconds_moving):
     """"
@@ -42,6 +43,18 @@ def init_database():
     
     conn.commit()
     conn.close()
+
+def calculate_fare(seconds_stopped, seconds_moving): #Test Unitario para la función de cálculo de tarifa
+    return seconds_stopped*0.02 + seconds_moving *0.05
+
+class TestFareCalculation(unittest.TestCase):
+        def test_fare_calculation(self):
+            self.assertAlmostEqual(calculate_fare(0, 0), 0.00)
+            self.assertAlmostEqual(calculate_fare(60, 0), 1.20)  # 60s stopped
+            self.assertAlmostEqual(calculate_fare(0, 60), 3.00)  # 60s moving
+            self.assertAlmostEqual(calculate_fare(30, 30), 2.10) # 30s stopped + 30s moving
+            self.assertAlmostEqual(calculate_fare(120, 240), 14.40) # 120s stopped + 240s moving    
+unittest.main(argv=[''], exit=False)
 
 def register():
     """
