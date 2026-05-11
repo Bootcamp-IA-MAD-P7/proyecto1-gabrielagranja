@@ -4,6 +4,24 @@ import hashlib
 import unittest
 from datetime import datetime
 
+LOG_FILE = "access.log"
+DEFAULT_TARIFA_PARADO = 0.02
+DEFAULT_TARIFA_MOVIMIENTO = 0.05
+DB_PATH = 'taximeter.db'
+
+
+def log_access_event(username, action, success, details=""):
+    """
+    Registra eventos de acceso y seguridad en un archivo de log.
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    status = "SUCCESS" if success else "FAIL"
+    username = username if username else "UNKNOWN"
+    entry = f"{timestamp} | {status} | {action} | {username} | {details}\n"
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(entry)
+
+
 def calculate_fare(seconds_stopped, seconds_moving, tarifa_parado, tarifa_movimiento):
     """
     Calcula la tarifa total del viaje en función del tiempo parado
@@ -19,7 +37,6 @@ def calculate_fare(seconds_stopped, seconds_moving, tarifa_parado, tarifa_movimi
     - fare: importe total del viaje en euros.
     """
     fare = (seconds_stopped * tarifa_parado + seconds_moving * tarifa_movimiento)
-    print(f"Total: {fare:.2f} €")
     return fare
 
 def configurar_tarifas():
@@ -29,16 +46,16 @@ def configurar_tarifas():
     print("\nConfiguración de tarifas")
     print("Pulsa Enter para usar los valores por defecto.")
 
-    tarifa_parado = input("Tarifa por segundo parado [0.02]: ").strip()
-    tarifa_movimiento = input("Tarifa por segundo en movimiento [0.05]: ").strip()
+    tarifa_parado = input(f"Tarifa por segundo parado [{DEFAULT_TARIFA_PARADO}]: ").strip()
+    tarifa_movimiento = input(f"Tarifa por segundo en movimiento [{DEFAULT_TARIFA_MOVIMIENTO}]: ").strip()
 
     if tarifa_parado == "":
-        tarifa_parado = 0.02
+        tarifa_parado = DEFAULT_TARIFA_PARADO
     else:
         tarifa_parado = float(tarifa_parado)
 
     if tarifa_movimiento == "":
-        tarifa_movimiento = 0.05
+        tarifa_movimiento = DEFAULT_TARIFA_MOVIMIENTO
     else:
         tarifa_movimiento = float(tarifa_movimiento)
 
@@ -48,7 +65,7 @@ def init_database():
     """
     Inicializa la base de datos SQLite con tabla de usuarios.
     """
-    conn = sqlite3.connect('taximeter.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS users
                  (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password_hash TEXT)''')
@@ -84,17 +101,19 @@ def register():
         username = input("Ingrese un nombre de usuario: ").strip()
         
         # Validar que el usuario no exista
-        conn = sqlite3.connect('taximeter.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute("SELECT * FROM users WHERE username=?", (username,))
         if c.fetchone():
             conn.close()
             print("❌ Este usuario ya existe. Intente con otro nombre.\n")
+            log_access_event(username, "REGISTER", False, "Usuario ya existe")
             continue
         conn.close()
         
         if len(username) < 3:
             print("❌ El usuario debe tener al menos 3 caracteres.\n")
+            log_access_event(username, "REGISTER", False, "Nombre de usuario demasiado corto")
             continue
         
         password = input("Ingrese una contraseña: ").strip()
@@ -102,21 +121,24 @@ def register():
         
         if password != password_confirm:
             print("❌ Las contraseñas no coinciden.\n")
+            log_access_event(username, "REGISTER", False, "Contraseñas no coinciden")
             continue
         
         if len(password) < 5:
             print("❌ La contraseña debe tener al menos 5 caracteres.\n")
+            log_access_event(username, "REGISTER", False, "Contraseña demasiado corta")
             continue
         
         # Registrar el nuevo usuario
         pwd_hash = hashlib.sha256(password.encode()).hexdigest()
-        conn = sqlite3.connect('taximeter.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (username, pwd_hash))
         conn.commit()
         conn.close()
         
         print(f"\n✓ ¡Usuario '{username}' registrado exitosamente!\n")
+        log_access_event(username, "REGISTER", True, "Registro exitoso")
         return username
 
 def main_menu():
@@ -165,7 +187,7 @@ def login():
         password = input("Contraseña: ").strip()
         pwd_hash = hashlib.sha256(password.encode()).hexdigest()
         
-        conn = sqlite3.connect('taximeter.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute("SELECT * FROM users WHERE username=? AND password_hash=?", (username, pwd_hash))
         result = c.fetchone()
@@ -173,14 +195,17 @@ def login():
         
         if result:
             print(f"\n✓ ¡Bienvenido, {username}!\n")
+            log_access_event(username, "LOGIN", True, "Login exitoso")
             return username
         else:
             attempts += 1
             remaining = max_attempts - attempts
+            log_access_event(username, "LOGIN", False, f"Credenciales incorrectas, intento {attempts}")
             if remaining > 0:
                 print(f"❌ Credenciales incorrectas. Intentos restantes: {remaining}\n")
             else:
                 print("❌ Demasiados intentos fallidos. Saliendo...\n")
+                log_access_event(username, "LOGIN", False, "Bloqueo por demasiados intentos")
                 return None
     
     return None
@@ -190,7 +215,7 @@ def update_state_duration(estado_actual, inicio_estado, tiempo_parado, tiempo_mo
     Actualiza el tiempo acumulado basado en el estado actual.
     
     Parámetros:
-    - estado_actual: estado actual ('stopped' o 'moving')
+    - estado_actual: estado actual ('detenido' o 'movimiento')
     - inicio_estado: tiempo de inicio del estado actual
     - tiempo_parado: tiempo acumulado parado (float)
     - tiempo_movimiento: tiempo acumulado en movimiento (float)
@@ -199,45 +224,140 @@ def update_state_duration(estado_actual, inicio_estado, tiempo_parado, tiempo_mo
     - tiempo_parado, tiempo_movimiento: valores actualizados
     """
     duration = time.time() - inicio_estado
-    if estado_actual == "stopped":
+    if estado_actual == "detenido":
         tiempo_parado += duration
     else:
         tiempo_movimiento += duration
     return tiempo_parado, tiempo_movimiento
 
-def handle_start(viaje_activo, inicio_viaje, tiempo_parado, tiempo_movimiento, estado_actual, inicio_estado):
+
+def create_trip_state():
     """
-    Maneja el comando 'start' para iniciar un nuevo viaje.
+    Create a fresh trip state dictionary for CLI or GUI use.
+    """
+    return {
+        "active": False,
+        "start_time": 0.0,
+        "stopped_time": 0.0,
+        "moving_time": 0.0,
+        "status": None,
+        "status_start_time": 0.0,
+        "finished": False,
+    }
+
+
+def start_trip_state(state):
+    """
+    Start a new trip and set the initial state to stopped.
+    """
+    if state["active"]:
+        return False
+    state.update({
+        "active": True,
+        "start_time": time.time(),
+        "stopped_time": 0.0,
+        "moving_time": 0.0,
+        "status": "detenido",
+        "status_start_time": time.time(),
+        "finished": False,
+    })
+    return True
+
+
+def stop_trip_state(state):
+    """
+    Switch the trip state to stopped and accumulate moving time.
+    """
+    if not state["active"] or state["status"] == "detenido":
+        return False
+    state["stopped_time"], state["moving_time"] = update_state_duration(
+        state["status"], state["status_start_time"], state["stopped_time"], state["moving_time"]
+    )
+    state["status"] = "detenido"
+    state["status_start_time"] = time.time()
+    return True
+
+
+def resume_trip_state(state):
+    """
+    Switch the trip state to moving and accumulate stopped time.
+    """
+    if not state["active"] or state["status"] == "movimiento":
+        return False
+    state["stopped_time"], state["moving_time"] = update_state_duration(
+        state["status"], state["status_start_time"], state["stopped_time"], state["moving_time"]
+    )
+    state["status"] = "movimiento"
+    state["status_start_time"] = time.time()
+    return True
+
+
+def finish_trip_state(state, tarifa_parado, tarifa_movimiento, username="GUI"):
+    """
+    Finalize the trip, compute fare, and save the trip to history.
+
+    Returns a result dict with totals or None if no active trip.
+    """
+    if not state["active"]:
+        return None
+    state["stopped_time"], state["moving_time"] = update_state_duration(
+        state["status"], state["status_start_time"], state["stopped_time"], state["moving_time"]
+    )
+    total_duration = state["stopped_time"] + state["moving_time"]
+    total_fare = calculate_fare(state["stopped_time"], state["moving_time"], tarifa_parado, tarifa_movimiento)
+    guardar_historial(username, total_fare, total_duration, state["stopped_time"], state["moving_time"])
+    state["active"] = False
+    state["status"] = "finalizado"
+    state["finished"] = True
+    return {
+        "total_fare": total_fare,
+        "total_duration": total_duration,
+        "stopped_time": state["stopped_time"],
+        "moving_time": state["moving_time"],
+    }
+
+
+def reset_trip_state(state):
+    """
+    Reset the trip state for a new trip.
+    """
+    state.update(create_trip_state())
+    return state
+
+
+def handle_iniciar(viaje_activo, inicio_viaje, tiempo_parado, tiempo_movimiento, estado_actual, inicio_estado):
+    """
+    Maneja el comando 'iniciar' para iniciar un nuevo viaje.
     """
     if viaje_activo:
         print("\n⚠️  ERROR: Ya hay un viaje en curso")
-        print("   Usa 'finish' para finalizar antes de iniciar uno nuevo.\n")
+        print("   Usa 'finalizar' para finalizar antes de iniciar uno nuevo.\n")
         return viaje_activo, inicio_viaje, tiempo_parado, tiempo_movimiento, estado_actual, inicio_estado
     viaje_activo = True
     inicio_viaje = time.time()
     tiempo_parado = 0
     tiempo_movimiento = 0
-    estado_actual = "stopped"
+    estado_actual = "detenido"
     inicio_estado = time.time()
-    print("Viaje iniciado. Estado incial: 'stopped'.")
+    print("Viaje iniciado. Estado inicial: 'detenido'.")
     return viaje_activo, inicio_viaje, tiempo_parado, tiempo_movimiento, estado_actual, inicio_estado
 
-def handle_stop_or_move(command, viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento):
+def handle_detener_o_mover(command, viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento):
     """
-    Maneja los comandos 'stop' y 'move'.
+    Maneja los comandos 'detener' y 'mover'.
     """
     if not viaje_activo:
-        print("Error: no hay un viaje en curso. Por favor empice un viaje.")
+        print("Error: no hay un viaje en curso. Por favor empiece un viaje.")
         return viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento
     tiempo_parado, tiempo_movimiento = update_state_duration(estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento)
-    estado_actual = "stopped" if command == "stop" else "moving"
+    estado_actual = "detenido" if command == "detener" else "movimiento"
     inicio_estado = time.time()
-    print(f"state changed to '{estado_actual}' .")
+    print(f"Estado cambiado a '{estado_actual}'.")
     return viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento
 
-def handle_finish(viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento, tarifa_parado, tarifa_movimiento, user):
+def handle_finalizar(viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento, tarifa_parado, tarifa_movimiento, user):
     """
-    Maneja el comando 'finish' para finalizar el viaje.
+    Maneja el comando 'finalizar' para finalizar el viaje.
     """
     if not viaje_activo:
         print("Error: no hay un viaje en curso para finalizar.")
@@ -259,22 +379,23 @@ def handle_finish(viaje_activo, estado_actual, inicio_estado, tiempo_parado, tie
     print("=" * 40 + "\n")
     print("=" * 40)
     print("¿Qué deseas hacer ahora?")
-    print("  'start' - Iniciar un nuevo viaje")
-    print("  'exit'  - Salir del programa")
+    print("  'iniciar' - Iniciar un nuevo viaje")
+    print("  'salir'  - Salir del programa")
     print("=" * 40 + "\n")
     # Reset variables para el próximo viaje
     viaje_activo = False
     estado_actual = None
     return viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento
 
-def handle_exit(viaje_activo, estado_actual):
+def handle_salir(viaje_activo, estado_actual):
     """
-    Maneja el comando 'exit' para salir del programa.
+    Maneja el comando 'salir' para salir del programa.
     Devuelve True si debe salir, False si continuar.
     """
     confirm = input("¿Estás seguro de que deseas salir? (s/n): ").strip().lower()
     if confirm == "s":
         print("\n¡Gracias por usar el taxímetro! ¡Hasta luego!\n")
+        log_access_event("UNKNOWN", "PROGRAM_EXIT", True, "Salida del programa")
         return True
     else:
         print("\n" + "=" * 40)
@@ -286,13 +407,14 @@ def handle_exit(viaje_activo, estado_actual):
             print("Estado actual: Sin viaje activo")
         print("Próximos pasos:")
         if viaje_activo:
-            print("  • 'stop'   - Detener el taxi")
-            print("  • 'move'   - Reanudar movimiento")
-            print("  • 'finish' - Finalizar el viaje actual")
+            print("  • 'detener'   - Detener el taxi")
+            print("  • 'mover'   - Reanudar movimiento")
+            print("  • 'finalizar' - Finalizar el viaje actual")
         else:
-            print("  • 'start'  - Iniciar un nuevo viaje")
-        print("  • 'exit'   - Salir del programa")
+            print("  • 'iniciar'  - Iniciar un nuevo viaje")
+        print("  • 'salir'   - Salir del programa")
         print("=" * 40 + "\n")
+        log_access_event("UNKNOWN", "PROGRAM_EXIT", False, "Salida cancelada")
         return False
 
 def taximeter():
@@ -310,11 +432,11 @@ def taximeter():
     print("Bienvenido. Tarifa: "
         f"{tarifa_parado:.2f} €/s (parado) | {tarifa_movimiento:.2f} €/s (movimiento)\n")
     print("Comandos disponibles:")
-    print("  'start'  - Iniciar un nuevo viaje")
-    print("  'stop'   - Detener el taxi (acumula tiempo parado)")
-    print("  'move'   - Reanudar movimiento (acumula tiempo en movimiento)")
-    print("  'finish' - Finalizar el viaje y calcular tarifa")
-    print("  'exit'   - Salir del programa")
+    print("  'iniciar'  - Iniciar un nuevo viaje")
+    print("  'detener'   - Detener el taxi (acumula tiempo parado)")
+    print("  'mover'   - Reanudar movimiento (acumula tiempo en movimiento)")
+    print("  'finalizar' - Finalizar el viaje y calcular tarifa")
+    print("  'salir'   - Salir del programa")
     print("=" * 40 + "\n")
     
     # Declaración de variables para contar el tiempo detenido y en movimiento
@@ -329,7 +451,7 @@ def taximeter():
     inicio_viaje = 0
     tiempo_parado = 0
     tiempo_movimiento = 0
-    estado_actual = None # 'stopped' o 'moving'
+    estado_actual = None # 'detenido' o 'movimiento'
     inicio_estado = 0
 
     # Codificando el event loop 
@@ -338,22 +460,21 @@ def taximeter():
     while not should_exit:
         command = input("> ").strip().lower()
 
-        if command == "start":
-            viaje_activo, inicio_viaje, tiempo_parado, tiempo_movimiento, estado_actual, inicio_estado = handle_start(viaje_activo, inicio_viaje, tiempo_parado, tiempo_movimiento, estado_actual, inicio_estado)
+        if command == "iniciar":
+            viaje_activo, inicio_viaje, tiempo_parado, tiempo_movimiento, estado_actual, inicio_estado = handle_iniciar(viaje_activo, inicio_viaje, tiempo_parado, tiempo_movimiento, estado_actual, inicio_estado)
 
-        elif command in ("stop", "move"):
-            viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento = handle_stop_or_move(command, viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento)
+        elif command in ("detener", "mover"):
+            viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento = handle_detener_o_mover(command, viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento)
 
-        elif command == "finish":
-            viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento = handle_finish(viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento, tarifa_parado, tarifa_movimiento, user)
+        elif command == "finalizar":
+            viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento = handle_finalizar(viaje_activo, estado_actual, inicio_estado, tiempo_parado, tiempo_movimiento, tarifa_parado, tarifa_movimiento, user)
 
-        elif command == "exit":
-            should_exit = handle_exit(viaje_activo, estado_actual)
+        elif command == "salir":
+            should_exit = handle_salir(viaje_activo, estado_actual)
 
         else:
-            print("Comando no reconocido. Por favor, use 'start', 'stop', 'move', 'finish' o 'exit'.")
-from datetime import datetime
-
+            print("Comando no reconocido. Por favor, use 'iniciar', 'detener', 'mover', 'finalizar' o 'salir'.")
+            log_access_event(user, "COMMAND", False, f"Comando no reconocido: {command}")
 def guardar_historial(username, fare, total_duration, tiempo_parado, tiempo_movimiento):
     """
     Guarda el historial de viajes en un archivo de texto plano.
@@ -364,7 +485,7 @@ def guardar_historial(username, fare, total_duration, tiempo_parado, tiempo_movi
     
     registro = (
         f"{fecha} - "
-        f"User: {username}, "
+        f"Usuario: {username}, "
         f"Tarifa: €{fare:.2f}, "
         f"Duración Total: {total_duration:.1f}s, "
         f"Parado: {tiempo_parado:.1f}s, "
