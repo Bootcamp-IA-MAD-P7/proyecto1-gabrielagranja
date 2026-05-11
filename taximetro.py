@@ -3,20 +3,49 @@ import sqlite3
 import hashlib
 import unittest
 
-def calculate_fare(seconds_stopped, seconds_moving):
-    """"
-    Calcular la tarifa total en euros.
-    - Stopped: 0.02 €/s
-    - Moving: 0.05 €/s
+def calculate_fare(seconds_stopped, seconds_moving, tarifa_parado, tarifa_movimiento):
     """
+    Calcula la tarifa total del viaje en función del tiempo parado
+    y el tiempo en movimiento, utilizando tarifas configurables.
 
-    fare = seconds_stopped*0.02 + seconds_moving *0.05
-    print(f"Total: {fare} €")
+    Parámetros:
+    - seconds_stopped: tiempo detenido en segundos.
+    - seconds_moving: tiempo en movimiento en segundos.
+    - tarifa_parado: precio por segundo detenido.
+    - tarifa_movimiento: precio por segundo en movimiento.
+
+    Devuelve:
+    - fare: importe total del viaje en euros.
+    """
+    fare = (seconds_stopped * tarifa_parado + seconds_moving * tarifa_movimiento)
+    print(f"Total: {fare:.2f} €")
     return fare
 
 import time
 import sqlite3
 import hashlib
+
+def configurar_tarifas():
+    """
+    Permite configurar las tarifas del taxímetro.
+    """
+    print("\nConfiguración de tarifas")
+    print("Pulsa Enter para usar los valores por defecto.")
+
+    tarifa_parado = input("Tarifa por segundo parado [0.02]: ").strip()
+    tarifa_movimiento = input("Tarifa por segundo en movimiento [0.05]: ").strip()
+
+    if tarifa_parado == "":
+        tarifa_parado = 0.02
+    else:
+        tarifa_parado = float(tarifa_parado)
+
+    if tarifa_movimiento == "":
+        tarifa_movimiento = 0.05
+    else:
+        tarifa_movimiento = float(tarifa_movimiento)
+
+    return tarifa_parado, tarifa_movimiento
 
 def init_database():
     """
@@ -167,11 +196,12 @@ def taximeter():
     user = main_menu()
     if user is None:
         return  # Salir si el usuario cancela
-    
+    tarifa_parado, tarifa_movimiento = configurar_tarifas()
     print("=" * 40)
     print("         SISTEMA DE TAXÍMETRO")
     print("=" * 40)
-    print("Bienvenido. Tarifa: 0.02 €/s (parado) | 0.05 €/s (movimiento)\n")
+    print("Bienvenido. Tarifa: "
+        f"{tarifa_parado:.2f} €/s (parado) | {tarifa_movimiento:.2f} €/s (movimiento)\n")
     print("Comandos disponibles:")
     print("  'start'  - Iniciar un nuevo viaje")
     print("  'stop'   - Detener el taxi (acumula tiempo parado)")
@@ -243,7 +273,7 @@ def taximeter():
 
             # Calcula la tarifa total y muestra el reumen del viaje
             
-            total_fare = calculate_fare(tiempo_parado, tiempo_movimiento)
+            total_fare = calculate_fare(tiempo_parado, tiempo_movimiento, tarifa_parado, tarifa_movimiento)
 
             total_duration = tiempo_parado + tiempo_movimiento
             
@@ -333,16 +363,14 @@ def guardar_historial(username, fare, total_duration, tiempo_parado, tiempo_movi
     return registro
 
 #Test Unitario para la función de guardar historial
-def calculate_fare(seconds_stopped, seconds_moving): 
-    return seconds_stopped*0.02 + seconds_moving *0.05
 
 class TestFareCalculation(unittest.TestCase):
-        def test_fare_calculation(self):
-            self.assertAlmostEqual(calculate_fare(0, 0), 0.00)
-            self.assertAlmostEqual(calculate_fare(60, 0), 1.20)  # 60s stopped
-            self.assertAlmostEqual(calculate_fare(0, 60), 3.00)  # 60s moving
-            self.assertAlmostEqual(calculate_fare(30, 30), 2.10) # 30s stopped + 30s moving
-            self.assertAlmostEqual(calculate_fare(120, 240), 14.40) # 120s stopped + 240s moving    
+     def test_fare_calculation(self):
+        self.assertAlmostEqual(calculate_fare(0, 0, 0.02, 0.05), 0.00)
+        self.assertAlmostEqual(calculate_fare(60, 0, 0.02, 0.05), 1.20)  # 60s stopped
+        self.assertAlmostEqual(calculate_fare(0, 60, 0.02, 0.05), 3.00)  # 60s moving
+        self.assertAlmostEqual(calculate_fare(30, 30, 0.02, 0.05), 2.10) # 30s stopped + 30s moving
+        self.assertAlmostEqual(calculate_fare(120, 240, 0.02, 0.05), 14.40) # 120s stopped + 240s moving    
 #MAIN
 if __name__ == "__main__":
     taximeter()
