@@ -34,10 +34,10 @@ class TaximeterGUI(tk.Tk):
         self.status_var = tk.StringVar()
         self.fare_var = tk.StringVar()
 
-        header = tk.Label(self, text="Taxímetro - Control de Viaje", font=("Arial", 14, "bold"))
+        header = tk.Label(self, text="Taxímetro", font=("Arial", 16, "bold"))
         header.grid(row=0, column=0, columnspan=2, padx=12, pady=10)
 
-        tk.Label(self, text="Status:", font=("Arial", 10)).grid(row=1, column=0, sticky="w", padx=12)
+        tk.Label(self, text="Estado:", font=("Arial", 10)).grid(row=1, column=0, sticky="w", padx=12)
         tk.Label(self, textvariable=self.status_var, font=("Arial", 10), fg="blue").grid(row=1, column=1, sticky="w")
 
         tk.Label(self, text="Total fare:", font=("Arial", 10)).grid(row=2, column=0, sticky="w", padx=12)
@@ -46,11 +46,11 @@ class TaximeterGUI(tk.Tk):
         button_frame = tk.Frame(self)
         button_frame.grid(row=3, column=0, columnspan=2, pady=14)
 
-        tk.Button(button_frame, text="Start Trip", width=12, command=self.on_start).grid(row=0, column=0, padx=6, pady=4)
-        tk.Button(button_frame, text="Stop", width=12, command=self.on_stop).grid(row=0, column=1, padx=6, pady=4)
+        tk.Button(button_frame, text="Empezar Viaje", width=12, command=self.on_start).grid(row=0, column=0, padx=6, pady=4)
+        tk.Button(button_frame, text="Parar", width=12, command=self.on_stop).grid(row=0, column=1, padx=6, pady=4)
         tk.Button(button_frame, text="Resume", width=12, command=self.on_resume).grid(row=1, column=0, padx=6, pady=4)
-        tk.Button(button_frame, text="Finish Trip", width=12, command=self.on_finish).grid(row=1, column=1, padx=6, pady=4)
-        tk.Button(button_frame, text="New Trip", width=26, command=self.on_new_trip).grid(row=2, column=0, columnspan=2, padx=6, pady=4)
+        tk.Button(button_frame, text="Finalizar Viaje ", width=12, command=self.on_finish).grid(row=1, column=1, padx=6, pady=4)
+        tk.Button(button_frame, text="Nuevo Viaje", width=26, command=self.on_new_trip).grid(row=2, column=0, columnspan=2, padx=6, pady=4)
 
         footer = tk.Label(self, text=f"Tarifa parada: {self.tarifa_parado:.2f} €/s | Tarifa movimiento: {self.tarifa_movimiento:.2f} €/s", font=("Arial", 8))
         footer.grid(row=4, column=0, columnspan=2, pady=6)
@@ -123,7 +123,14 @@ class TaximeterGUI(tk.Tk):
 
 def main():
     app = TaximeterGUI()
-    app.mainloop()
+    app.geometry("600x600")  # Tamaño de la ventana
+    app.configure(bg="#f0f0f0")  # Fondo claro  
+    app.option_add("*Font", "Arial 12")  # Fuente global para la aplicación 
+    app.option_add("*Button.Background", "#4CAF50")  # Color de fondo de los botones
+    app.option_add("*Button.Foreground", "white")  # Color del texto de los botones 
+    app.option_add("*Button.ActiveBackground", "#45a049")  # Color de fondo al hacer clic en los botones
+    app.option_add("*Label.Background", "#f0f0f0")  # Fondo de las etiquetas    
+    app.mainloop() # Cambia la estética
 
 
 if __name__ == "__main__":

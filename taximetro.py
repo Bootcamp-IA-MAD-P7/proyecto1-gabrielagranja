@@ -65,7 +65,7 @@ def init_database():
     """
     Inicializa la base de datos SQLite con tabla de usuarios.
     """
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect('taximeter.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS users
                  (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password_hash TEXT)''')
@@ -101,7 +101,7 @@ def register():
         username = input("Ingrese un nombre de usuario: ").strip()
         
         # Validar que el usuario no exista
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect('taximeter.db')
         c = conn.cursor()
         c.execute("SELECT * FROM users WHERE username=?", (username,))
         if c.fetchone():
@@ -131,7 +131,7 @@ def register():
         
         # Registrar el nuevo usuario
         pwd_hash = hashlib.sha256(password.encode()).hexdigest()
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect('taximeter.db')
         c = conn.cursor()
         c.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (username, pwd_hash))
         conn.commit()
@@ -187,7 +187,7 @@ def login():
         password = input("Contraseña: ").strip()
         pwd_hash = hashlib.sha256(password.encode()).hexdigest()
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect('taximeter.db')
         c = conn.cursor()
         c.execute("SELECT * FROM users WHERE username=? AND password_hash=?", (username, pwd_hash))
         result = c.fetchone()
