@@ -15,49 +15,18 @@ from taximetro import (
     log_access_event,
 )
 
+
 class TaximeterGUI(tk.Tk):
+    """Simple Tkinter GUI for the taximeter trip flow."""
 
     def __init__(self):
         super().__init__()
-
         self.title("Taxímetro GUI")
-        self.geometry("600x600")  # Tamaño de la ventana
-        self.resizable(False, False)        
+        self.resizable(False, False)
         self.state = create_trip_state()
         self.tarifa_parado = DEFAULT_TARIFA_PARADO
         self.tarifa_movimiento = DEFAULT_TARIFA_MOVIMIENTO
         self.username = "GUI"
-
-        self.show_login_screen()
-
-    def clear_window(self):
-        for widget in self.winfo_children():
-            widget.destroy()
-   
-    #LOGIN SCREEN
-    def show_login_screen(self):
-        self.clear_window()
-
-        tk.Label(self,text= "LOGIN - SISTEMA DE TAXÍMETRO", font=("Arial", 18, "bold")).pack(pady=20)
-        tk.Label(self, text="Usuario:").pack()
-        self.username_entry = tk.Entry(self,width=30)
-        self.username_entry.pack(pady=5)
-        tk.Label(self, text="Contraseña:").pack()
-        self.password_entry = tk.Entry(self, show="*", width=30)
-        self.password_entry.pack(pady=5)
-        tk.Button(self, text="Iniciar Sesión", width=25, command=self.handle_login).pack(pady=10)
-    def handle_login(self):
-        username = self.username_entry.get().strip()
-        password = self.password_entry.get().strip()
-        
-        if username and password:
-            self.username = username
-            messagebox.showinfo("Login exitoso", f"Bienvenido, {username}!")
-            self.show_trip_screen()
-        else:messagebox.showerror("Error de Login", "Por favor, ingrese un usuario y contraseña válidos.")
-    #TAXIMETER SCREEN
-    def show_trip_screen(self): 
-        self.clear_window()
         self._build_widgets()
         self._update_ui()
 
@@ -70,13 +39,14 @@ class TaximeterGUI(tk.Tk):
 
         tk.Label(self, text="Estado:", font=("Arial", 10)).grid(row=1, column=0, sticky="w", padx=12)
         tk.Label(self, textvariable=self.status_var, font=("Arial", 10), fg="blue").grid(row=1, column=1, sticky="w")
+
         tk.Label(self, text="Total fare:", font=("Arial", 10)).grid(row=2, column=0, sticky="w", padx=12)
         tk.Label(self, textvariable=self.fare_var, font=("Arial", 10), fg="green").grid(row=2, column=1, sticky="w")
 
         button_frame = tk.Frame(self)
         button_frame.grid(row=3, column=0, columnspan=2, pady=14)
 
-        tk.Button(button_frame, text="Empezar Viaje", width=12, command=self.handle_login).grid(row=0, column=0, padx=6, pady=4)
+        tk.Button(button_frame, text="Empezar Viaje", width=12, command=self.on_start).grid(row=0, column=0, padx=6, pady=4)
         tk.Button(button_frame, text="Parar", width=12, command=self.on_stop).grid(row=0, column=1, padx=6, pady=4)
         tk.Button(button_frame, text="Resume", width=12, command=self.on_resume).grid(row=1, column=0, padx=6, pady=4)
         tk.Button(button_frame, text="Finalizar Viaje ", width=12, command=self.on_finish).grid(row=1, column=1, padx=6, pady=4)
@@ -154,9 +124,14 @@ class TaximeterGUI(tk.Tk):
 def main():
     app = TaximeterGUI()
     app.geometry("600x600")  # Tamaño de la ventana
-    app.configure(bg="#f0f0f0")
-    app.option_add("*Font", "Arial 12")  
+    app.configure(bg="#f0f0f0")  # Fondo claro  
+    app.option_add("*Font", "Arial 12")  # Fuente global para la aplicación 
+    app.option_add("*Button.Background", "#4CAF50")  # Color de fondo de los botones
+    app.option_add("*Button.Foreground", "white")  # Color del texto de los botones 
+    app.option_add("*Button.ActiveBackground", "#45a049")  # Color de fondo al hacer clic en los botones
+    app.option_add("*Label.Background", "#f0f0f0")  # Fondo de las etiquetas    
     app.mainloop() # Cambia la estética
+
 
 if __name__ == "__main__":
     main()
