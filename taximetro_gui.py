@@ -13,28 +13,40 @@ from taximetro import (
     DEFAULT_TARIFA_PARADO,
     DEFAULT_TARIFA_MOVIMIENTO,
     log_access_event,
+    init_database,
 )
 
 class TaximeterGUI(tk.Tk):
 
+    # INICIALIZACION 
     def __init__(self):
         super().__init__()
+        
+        self.title("Taxímetro")
+        self.geometry("600x600")
+        self.resizable(False, False)
 
-        self.title("Taxímetro GUI")
-        self.geometry("600x600")  # Tamaño de la ventana
-        self.resizable(False, False)        
+        init_database()
+        
+        self.tarifa_parado = DEFAULT_TARIFA_PARADO
+        self.tarifa_movimiento = DEFAULT_TARIFA_MOVIMIENTO
         self.state = create_trip_state()
         self.tarifa_parado = DEFAULT_TARIFA_PARADO
         self.tarifa_movimiento = DEFAULT_TARIFA_MOVIMIENTO
         self.username = "GUI"
 
-        self.show_login_screen()
+        self.show_home_screen()
 
+    # Configuración de la venta principal
+    def show_home_screen(self):
+        tk.Label(self,text= "BIENVENIDO", font=("Arial", 18, "bold")).pack(pady=20)
+        tk.Button(self, text="Iniciar Sesión", width=25, command=self.show_login_screen).pack(pady=10)  
+
+    #LIMPIAR LA PANTALLA
     def clear_window(self):
         for widget in self.winfo_children():
             widget.destroy()
-   
-    #LOGIN SCREEN
+    #MUESTRA PANTALLA DE LOGIN
     def show_login_screen(self):
         self.clear_window()
 
@@ -42,10 +54,13 @@ class TaximeterGUI(tk.Tk):
         tk.Label(self, text="Usuario:").pack()
         self.username_entry = tk.Entry(self,width=30)
         self.username_entry.pack(pady=5)
+
         tk.Label(self, text="Contraseña:").pack()
         self.password_entry = tk.Entry(self, show="*", width=30)
         self.password_entry.pack(pady=5)
+        
         tk.Button(self, text="Iniciar Sesión", width=25, command=self.handle_login).pack(pady=10)
+    #VALIDA EL LOGIN 
     def handle_login(self):
         username = self.username_entry.get().strip()
         password = self.password_entry.get().strip()
@@ -55,12 +70,14 @@ class TaximeterGUI(tk.Tk):
             messagebox.showinfo("Login exitoso", f"Bienvenido, {username}!")
             self.show_trip_screen()
         else:messagebox.showerror("Error de Login", "Por favor, ingrese un usuario y contraseña válidos.")
-    #TAXIMETER SCREEN
+    
+    #MUESTRA LA PANTALLA PRINCIPAL DEL TAXIMETRO
     def show_trip_screen(self): 
         self.clear_window()
         self._build_widgets()
         self._update_ui()
 
+    #CONSTRUYE LOS WIDGETS DE LA PANTALLA PRINCIPAL
     def _build_widgets(self):
         self.status_var = tk.StringVar()
         self.fare_var = tk.StringVar()
@@ -76,7 +93,7 @@ class TaximeterGUI(tk.Tk):
         button_frame = tk.Frame(self)
         button_frame.grid(row=3, column=0, columnspan=2, pady=14)
 
-        tk.Button(button_frame, text="Empezar Viaje", width=12, command=self.handle_login).grid(row=0, column=0, padx=6, pady=4)
+        tk.Button(button_frame, text="Empezar Viaje", width=12, command=self.on_start).grid(row=0, column=0, padx=6, pady=4)
         tk.Button(button_frame, text="Parar", width=12, command=self.on_stop).grid(row=0, column=1, padx=6, pady=4)
         tk.Button(button_frame, text="Resume", width=12, command=self.on_resume).grid(row=1, column=0, padx=6, pady=4)
         tk.Button(button_frame, text="Finalizar Viaje ", width=12, command=self.on_finish).grid(row=1, column=1, padx=6, pady=4)
@@ -84,7 +101,7 @@ class TaximeterGUI(tk.Tk):
 
         footer = tk.Label(self, text=f"Tarifa parada: {self.tarifa_parado:.2f} €/s | Tarifa movimiento: {self.tarifa_movimiento:.2f} €/s", font=("Arial", 8))
         footer.grid(row=4, column=0, columnspan=2, pady=6)
-
+    #CALCULA LOS TOTALES
     def _current_trip_totals(self):
         stopped = self.state["stopped_time"]
         moving = self.state["moving_time"]
@@ -95,8 +112,10 @@ class TaximeterGUI(tk.Tk):
             else:
                 moving += elapsed
         return stopped, moving
-
+    
+    #ACTUALIZA LA INTERFAZ DE USUARIO
     def _update_ui(self):
+
         if self.state["active"]:
             self.status_var.set(f"Active ({self.state['status']})")
         elif self.state["finished"]:
@@ -107,30 +126,33 @@ class TaximeterGUI(tk.Tk):
         stopped, moving = self._current_trip_totals()
         current_fare = calculate_fare(stopped, moving, self.tarifa_parado, self.tarifa_movimiento)
         self.fare_var.set(f"€ {current_fare:.2f}")
-
+    # MENSAJES EMERGENTES
     def _show_message(self, title, text, level="info"):
         if level == "error":
             messagebox.showerror(title, text)
         else:
             messagebox.showinfo(title, text)
-
+    #ACCIONES DE LOS BOTONES
     def on_start(self):
         if start_trip_state(self.state):
-            log_access_event(self.username, "GUI_TRIP_START", True, "Trip started")
+            log_access_event(self.username, "GUI_TRIP_START", True, "Viaje Iniciado")
+            self._show_message("Viaje Iniciado", "El viaje ha comenzado exitosamente.")
             self._update_ui()
         else:
-            self._show_message("Trip already active", "A trip is already active. Use Finish Trip or New Trip.")
+            self._show_message("Viaje activo", "Hay un viaje en curso. Finaliza el viaje o inicia uno nuevo.", level="error")
 
     def on_stop(self):
         if stop_trip_state(self.state):
-            log_access_event(self.username, "GUI_TRIP_STOP", True, "Trip stopped")
+            log_access_event(self.username, "GUI_TRIP_STOP", True, "Viaje detenido")
+            self._show_message("Viaje detenido", "El viaje ha sido detenido.")
             self._update_ui()
         else:
             self._show_message("Cannot stop", "There is no active moving trip to stop.", level="error")
 
     def on_resume(self):
         if resume_trip_state(self.state):
-            log_access_event(self.username, "GUI_TRIP_RESUME", True, "Trip resumed")
+            log_access_event(self.username, "GUI_TRIP_RESUME", True, "Viaje reanudado")
+            self._show_message("Viaje reanudado", "El viaje ha sido reanudado.")
             self._update_ui()
         else:
             self._show_message("Cannot resume", "There is no stopped trip to resume.", level="error")
@@ -138,18 +160,18 @@ class TaximeterGUI(tk.Tk):
     def on_finish(self):
         result = finish_trip_state(self.state, self.tarifa_parado, self.tarifa_movimiento, self.username)
         if result is None:
-            self._show_message("No active trip", "There is no active trip to finish.", level="error")
+            self._show_message("Sin viaje activo", "No hay un viake activo para terminar.", level="error")
             return
         fare_text = f"Trip finished. Total fare: € {result['total_fare']:.2f}\nTotal duration: {result['total_duration']:.1f} s"
+        
         log_access_event(self.username, "GUI_TRIP_FINISH", True, f"Fare: {result['total_fare']:.2f}")
-        self._show_message("Trip finished", fare_text)
+        self._show_message("Viaje finalizado", fare_text)
         self._update_ui()
 
     def on_new_trip(self):
         reset_trip_state(self.state)
         log_access_event(self.username, "GUI_TRIP_RESET", True, "New trip state initialized")
         self._update_ui()
-
 
 def main():
     app = TaximeterGUI()

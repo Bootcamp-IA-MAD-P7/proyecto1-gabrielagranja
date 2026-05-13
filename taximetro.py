@@ -302,7 +302,7 @@ def create_trip_state():
 
 def start_trip_state(state):
     """
-    Start a new trip and set the initial state to stopped.
+    Start a new trip and set the initial state to moving.
     """
     if state["active"]:
         return False
@@ -311,7 +311,7 @@ def start_trip_state(state):
         "start_time": time.time(),
         "stopped_time": 0.0,
         "moving_time": 0.0,
-        "status": "detenido",
+        "status": "movimiento",
         "status_start_time": time.time(),
         "finished": False,
     })
