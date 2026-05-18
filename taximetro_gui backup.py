@@ -15,7 +15,6 @@ from taximetro import (
     log_access_event,
 )
 
-
 class TaximeterGUI(tk.Tk):
     """Simple Tkinter GUI for the taximeter trip flow."""
 

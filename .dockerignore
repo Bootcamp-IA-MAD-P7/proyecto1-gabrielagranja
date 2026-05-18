@@ -1,0 +1,6 @@
+_pycache_/
+*.pyc
+.git/
+taximeter.db
+acces.log
+historial_viajes.txt
