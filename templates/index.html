@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Taxímetro Web</title>
+</head>
+<body>
+    <h1>Taxímetro Web</h1>
+
+    <p><strong>Estado:</strong> {{ state.status }}</p>
+    <p><strong>Viaje activo:</strong> {{ state.active }}</p>
+    <p><strong>Tiempo parado:</strong> {{ "%.1f"|format(state.stopped_time) }} s</p>
+    <p><strong>Tiempo en movimiento:</strong> {{ "%.1f"|format(state.moving_time) }} s</p>
+    <p><strong>Tarifa actual:</strong> {{ "%.2f"|format(fare) }} €</p>
+
+    <a href="/start"><button>Iniciar viaje</button></a>
+    <a href="/stop"><button>Detener</button></a>
+    <a href="/move"><button>Mover</button></a>
+    <a href="/finish"><button>Finalizar</button></a>
+
+    {% if result %}
+        <h2>Resumen del último viaje</h2>
+        <p>Total: {{ "%.2f"|format(result.total_fare) }} €</p>
+        <p>Duración: {{ "%.1f"|format(result.total_duration) }} s</p>
+    {% endif %}
+</body>
+</html>
